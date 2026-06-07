@@ -238,5 +238,4 @@ module flash_controller (
             endcase
         end
     end
-
 endmodule

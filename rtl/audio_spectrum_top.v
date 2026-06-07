@@ -409,6 +409,7 @@ hex_status_timer_display u_hex_display (
     .mode_code_bcd(mode_code),
     .status_code_bcd(status_code),
     .time_seconds(current_seconds),
+    .flash_slot(SW[11:10]),
     .sw_input_source(SW[17]),
     .HEX0(HEX0),
     .HEX1(HEX1),

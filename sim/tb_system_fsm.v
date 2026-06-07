@@ -9,6 +9,8 @@ module tb_system_fsm;
     localparam ST_PLAY_SRAM             = 4'd5;
     localparam ST_SAVE_FLASH_ERASE      = 4'd7;
     localparam ST_SAVE_FLASH_DONE       = 4'd10;
+    localparam ST_ERROR                 = 4'd14;
+    localparam FLASH_AUDIO_BASE         = 23'd32;
 
     reg clk;
     reg rst_n;
@@ -67,6 +69,7 @@ module tb_system_fsm;
     reg [15:0] sram_mem [0:31];
     integer i;
     integer sample_count;
+    integer slot_index;
 
     assign fl_dq = fl_dq_oe ? fl_wdata : 8'hZZ;
     assign fl_rdata = fl_dq;
@@ -75,7 +78,7 @@ module tb_system_fsm;
         .SAMPLE_RATE_HZ(48000),
         .SRAM_MAX_ADDR(20'd31),
         .FLASH_HEADER_WORDS(16),
-        .FLASH_AUDIO_BASE(23'd32),
+        .FLASH_AUDIO_BASE(FLASH_AUDIO_BASE),
         .CODEC_INIT_WAIT(26'd3),
         .LOAD_DONE_WAIT(26'd3)
     ) uut (
@@ -177,6 +180,15 @@ module tb_system_fsm;
     end
     endtask
 
+    task pulse_key3;
+    begin
+        @(posedge clk);
+        key3_pulse <= 1'b1;
+        @(posedge clk);
+        key3_pulse <= 1'b0;
+    end
+    endtask
+
     task pulse_key3_with_cancel;
     begin
         @(posedge clk);
@@ -185,6 +197,60 @@ module tb_system_fsm;
         @(posedge clk);
         key3_pulse <= 1'b0;
         cancel_pulse <= 1'b0;
+    end
+    endtask
+
+    task check_flash_slot;
+        input [1:0] slot;
+        reg [9:0] base;
+    begin
+        base = {slot, 8'h00};
+        $display("[TB] %0t DEBUG: slot %0d base=%0d base+32=%0d mem[base+32]=%h mem[base+33]=%h sram[0]=%h",
+                 $time, slot, base, base + FLASH_AUDIO_BASE[7:0],
+                 flash_inst.mem[base + FLASH_AUDIO_BASE[7:0] + 10'd0],
+                 flash_inst.mem[base + FLASH_AUDIO_BASE[7:0] + 10'd1],
+                 sram_mem[0]);
+        if (flash_inst.mem[base + 10'd0] !== 8'h5A ||
+            flash_inst.mem[base + 10'd1] !== 8'hA5) begin
+            $display("[TB] ERROR: slot %0d missing FLASH magic", slot);
+            $finish;
+        end
+        if (flash_inst.mem[base + FLASH_AUDIO_BASE[7:0] + 10'd0] !== sram_mem[0][7:0] ||
+            flash_inst.mem[base + FLASH_AUDIO_BASE[7:0] + 10'd1] !== sram_mem[0][15:8]) begin
+            $display("[TB] ERROR: slot %0d first data word mismatch", slot);
+            $finish;
+        end
+    end
+    endtask
+
+    task save_current_record_to_slot;
+        input [1:0] slot;
+    begin
+        sw[11:10] = slot;
+        sw[3] = 1'b1;
+        pulse_key3();
+        wait_state(ST_SAVE_FLASH_DONE, 200000);
+        check_flash_slot(slot);
+        $display("[TB] Save-to-FLASH slot %0d path completed", slot);
+        pulse_key3();
+        wait_state(ST_IDLE, 100);
+    end
+    endtask
+
+    task load_slot_and_check_play;
+        input [1:0] slot;
+    begin
+        sw[11:10] = slot;
+        pulse_key2();
+        wait_state(ST_PLAY_SRAM, 200000);
+        wait_dac_write(60000);
+        if (!flash_header_valid || flash_error) begin
+            $display("[TB] ERROR: slot %0d FLASH load header invalid or flash_error asserted", slot);
+            $finish;
+        end
+        pulse_key3_with_cancel();
+        wait_state(ST_IDLE, 100);
+        $display("[TB] Load-from-FLASH slot %0d and playback path passed", slot);
     end
     endtask
 
@@ -279,26 +345,20 @@ module tb_system_fsm;
         $display("[TB] FLASH lock gate blocked save when SW3=0");
 
         sw[3] = 1'b1;
+        sw[11:10] = 2'd0;
         pulse_key3_with_cancel();
         wait_state(ST_SAVE_FLASH_ERASE, 100);
         pulse_key3_with_cancel();
         wait_state(ST_IDLE, 100);
         $display("[TB] KEY3 cancel path exits FLASH save flow");
 
-        pulse_key3_with_cancel();
-        wait_state(ST_SAVE_FLASH_DONE, 200000);
-        $display("[TB] Save-to-FLASH path completed");
-
-        pulse_key3_with_cancel();
-        wait_state(ST_IDLE, 100);
-        pulse_key2();
-        wait_state(ST_PLAY_SRAM, 200000);
-        wait_dac_write(60000);
-        if (!flash_header_valid || flash_error) begin
-            $display("[TB] ERROR: FLASH load header invalid or flash_error asserted");
-            $finish;
+        for (slot_index = 0; slot_index < 4; slot_index = slot_index + 1) begin
+            save_current_record_to_slot(slot_index[1:0]);
         end
-        $display("[TB] Load-from-FLASH and playback path passed");
+
+        for (slot_index = 0; slot_index < 4; slot_index = slot_index + 1) begin
+            load_slot_and_check_play(slot_index[1:0]);
+        end
         $display("[TB] SUCCESS: system_fsm behavioral smoke test passed");
         $finish;
     end
@@ -324,11 +384,14 @@ module system_flash_model (
     output reg         FL_RY,
     inout  wire [7:0]  FL_DQ
 );
-    reg [7:0] mem [0:255];
+    reg [7:0] mem [0:1023];
     reg [2:0] cmd_state;
     reg [7:0] dio_out;
     reg       dio_oe;
     integer i;
+    wire [9:0] mem_addr;
+
+    assign mem_addr = {FL_ADDR[22:21], FL_ADDR[7:0]};
 
     localparam CMD_IDLE     = 3'd0;
     localparam CMD_UN1      = 3'd1;
@@ -345,14 +408,14 @@ module system_flash_model (
         cmd_state = CMD_IDLE;
         dio_oe = 1'b0;
         dio_out = 8'h00;
-        for (i = 0; i < 256; i = i + 1) begin
+        for (i = 0; i < 1024; i = i + 1) begin
             mem[i] = 8'hFF;
         end
     end
 
     always @(*) begin
         if (!FL_CE_N && !FL_OE_N && FL_WE_N) begin
-            dio_out = mem[FL_ADDR[7:0]];
+            dio_out = mem[mem_addr];
             dio_oe = 1'b1;
         end else begin
             dio_out = 8'h00;
@@ -400,13 +463,14 @@ module system_flash_model (
                         FL_RY <= 1'b0;
                         FL_RY <= #1000 1'b1;
                         for (i = 0; i < 256; i = i + 1) begin
-                            mem[i] <= #1000 8'hFF;
+                            mem[{FL_ADDR[22:21], i[7:0]}] <= #1000 8'hFF;
                         end
                     end
                     cmd_state <= CMD_IDLE;
                 end
                 CMD_PROG: begin
-                    mem[FL_ADDR[7:0]] <= FL_DQ & mem[FL_ADDR[7:0]];
+                    $display("[FLASH_MODEL] %0t Program addr=%h (mem_addr=%0d) with %h (old mem=%h)", $time, FL_ADDR, mem_addr, FL_DQ, mem[mem_addr]);
+                    mem[mem_addr] <= FL_DQ & mem[mem_addr];
                     FL_RY <= 1'b0;
                     FL_RY <= #200 1'b1;
                     cmd_state <= CMD_IDLE;

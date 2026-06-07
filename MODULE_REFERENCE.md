@@ -14,6 +14,16 @@ behavior, clocking assumption, or instantiation changes.
   IP under `ip/`. If IP must be edited, document why and how to validate it.
 - `.bak` files are historical backups and are not authoritative.
 
+## Version Notes
+
+- `v1.0` is the saved working audio recorder build captured before FLASH Slot
+  development. The tracked programming image is
+  `quartus/AudioSpectrum_FPGA.pof`.
+- Quartus generated databases, reports, `.sof`, workspace files, and
+  simulation waveforms are intentionally ignored. Keep source, project
+  settings, tests, documentation, and explicitly versioned programming images
+  under Git.
+
 ## Top Level
 
 ### `AudioSpectrum_FPGA`
@@ -36,6 +46,7 @@ behavior, clocking assumption, or instantiation changes.
   - `KEY[3]`: save/confirm/cancel depending on FSM state.
   - `SW[3]`: FLASH write unlock.
   - `SW[5]`: mute.
+  - `SW[11:10]`: FLASH Slot select, 0 through 3.
   - `SW[17]`: line-in/mic source selection.
 
 ## Project-Owned Audio Modules
@@ -82,6 +93,8 @@ behavior, clocking assumption, or instantiation changes.
   - `SRAM_MAX_ADDR`: highest SRAM word address.
   - `FLASH_HEADER_WORDS`: number of 16-bit header words.
   - `FLASH_AUDIO_BASE`: byte address where audio data begins.
+  - `FLASH_SLOT_MAX_WORDS`: maximum 16-bit audio words that fit in one
+    2 MiB FLASH slot after the 32-byte header.
   - `CODEC_INIT_WAIT`: startup wait cycles.
   - `LOAD_DONE_WAIT`: post-load display wait cycles.
 - Inputs:
@@ -95,6 +108,17 @@ behavior, clocking assumption, or instantiation changes.
   - Saves 16-bit SRAM words to 8-bit FLASH low byte first.
   - Loads FLASH header, validates magic, restores length, then loads audio.
   - `SW[3]` must be high before save can start.
+  - `SW[11:10]` selects one of four 2 MiB FLASH slots:
+    - Slot 0 base: `23'h000000`.
+    - Slot 1 base: `23'h200000`.
+    - Slot 2 base: `23'h400000`.
+    - Slot 3 base: `23'h600000`.
+  - Save/load/erase operate only inside the selected slot. The header remains
+    at the slot base, and audio data begins at `slot_base + FLASH_AUDIO_BASE`.
+  - The selected slot is latched when a FLASH save or load starts; changing
+    `SW[11:10]` mid-operation does not move the active FLASH address window.
+  - Recording stops at the lower of SRAM capacity and one-slot capacity so the
+    captured audio can always be saved to the selected slot.
 - JTAG/SignalTap debug:
   - Preserved counters expose SRAM/FLASH operation timing in `CLOCK_50` cycles:
     `dbg_sram_pending_cycles`, `dbg_sram_last_cycles`,
@@ -149,7 +173,14 @@ behavior, clocking assumption, or instantiation changes.
 ### `hex_status_timer_display`
 
 - File: `rtl/display/hex_status_timer_display.v`
-- Role: Multiplexes mode/status/time/input-source values to HEX displays.
+- Role: Multiplexes mode/status/slot/input-source/time values to HEX displays.
+- Display format:
+  - `HEX7`: mode ones digit.
+  - `HEX6`: status ones digit.
+  - `HEX5~HEX4`: FLASH Slot display, shown as `50`, `51`, `52`, or `53`
+    where `5` visually represents `S`.
+  - `HEX3~HEX2`: input source, `C1` for line-in and `b2` for mic-in.
+  - `HEX1~HEX0`: seconds.
 
 ### `sevenseg_decoder`
 
@@ -253,12 +284,20 @@ behavior, clocking assumption, or instantiation changes.
 
 - File: `sim/tb_system_fsm.v`
 - Role: Behavioral smoke test for reset, record, SRAM playback, FLASH save
-  gate, cancel, save, load, and playback.
+  gate, cancel, selected-slot save, selected-slot load, and playback.
 
 ### `system_flash_model`
 
 - File: `sim/tb_system_fsm.v`
 - Role: Simple FLASH model used by `tb_system_fsm`.
+- Behavior: Models four independent slot banks by preserving address bits
+  `[22:21]` in the simulated memory index.
+
+### `tb_hex_status_timer_display`
+
+- File: `sim/tb_hex_status_timer_display.v`
+- Role: Checks HEX placement for mode, status, FLASH Slot, input source, and
+  seconds.
 
 ### `tb_flash_test`
 

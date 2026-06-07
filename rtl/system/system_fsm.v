@@ -13,6 +13,7 @@ module system_fsm #(
     parameter SRAM_MAX_ADDR     = 20'hFFFFF,  // 1M words (1,048,575)
     parameter FLASH_HEADER_WORDS = 16,         // 16 words of header
     parameter FLASH_AUDIO_BASE  = 23'd32,      // byte addr = 16 words * 2 bytes
+    parameter FLASH_SLOT_MAX_WORDS = 20'hFFFF0, // 2MiB slot - 32-byte header
     parameter CODEC_INIT_WAIT   = 26'd50_000_000, // 1 second @ 50MHz
     parameter LOAD_DONE_WAIT    = 26'd25_000_000  // 0.5 second @ 50MHz
 )(
@@ -114,7 +115,7 @@ localparam FL_SUB_READ_WAIT     = 4'd4;
 // =========================================================================
 // Internal registers
 // =========================================================================
-reg [3:0]  state, next_state;
+reg [3:0]  state;
 reg [25:0] init_counter;           // Codec init wait counter
 reg [19:0] sram_write_ptr;         // SRAM write address (recording)
 reg [19:0] sram_read_ptr;          // SRAM read address (playback)
@@ -140,6 +141,8 @@ reg [19:0] fl_data_word_counter;   // Data word counter for save/load
 reg [19:0] flash_audio_length;     // Audio length from FLASH header
 reg [31:0] fl_timeout_counter;     // Timeout counter for FLASH ops (32-bit to avoid truncation)
 reg [6:0]  erase_sector_idx;       // Sector counter during erase (7 bits for 128 sectors)
+reg [1:0]  active_flash_slot;      // Slot latched when a FLASH save/load starts
+reg        fl_waiting_for_done;    // 1=waiting for low-level controller done
 
 // SRAM operation timing
 reg [2:0]  sram_wait;              // Wait states for SRAM access
@@ -172,6 +175,7 @@ wire sw_mute          = sw[5];
 wire [1:0] sw_sensitivity = sw[7:6];
 wire sw_lcd_debug     = sw[8];
 wire sw_ledg_debug    = sw[9];
+wire [1:0] sw_flash_slot = sw[11:10];
 
 // =========================================================================
 // Combinational FLASH header generation
@@ -189,18 +193,21 @@ always @(*) begin
 end
 
 // Combinational calculations for multi-sector erase
+localparam [19:0] FLASH_SLOT_MAX_ADDR = FLASH_SLOT_MAX_WORDS - 20'd1;
+wire [19:0] record_limit_addr = (SRAM_MAX_ADDR < FLASH_SLOT_MAX_ADDR) ?
+                                SRAM_MAX_ADDR : FLASH_SLOT_MAX_ADDR;
+wire [22:0] sw_flash_slot_base = {sw_flash_slot, 21'd0};
+wire [6:0]  sw_flash_slot_sector_base = {sw_flash_slot, 5'd0};
+wire [22:0] flash_slot_base = {active_flash_slot, 21'd0};
+wire [6:0]  flash_slot_sector_base = {active_flash_slot, 5'd0};
+wire [22:0] flash_data_base = flash_slot_base + FLASH_AUDIO_BASE;
 wire [22:0] total_bytes_needed = {3'd0, record_length_words, 1'b0} + 23'd32;
-wire [6:0]  last_sector_needed  = total_bytes_needed[22:16];
+wire [22:0] total_bytes_last = total_bytes_needed - 23'd1;
+wire [6:0]  last_sector_needed = flash_slot_sector_base + 7'd31;
 
 // =========================================================================
 // FSM state register
-// =========================================================================
-always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
-        state <= ST_RESET;
-    else
-        state <= next_state;
-end
+
 
 assign fsm_state = state;
 
@@ -252,7 +259,7 @@ flash_controller flash_ctrl_inst (
 // Main FSM
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        next_state          <= ST_RESET;
+        state          <= ST_RESET;
         sram_write_ptr      <= 20'd0;
         sram_read_ptr       <= 20'd0;
         record_length_words <= 20'd0;
@@ -281,6 +288,8 @@ always @(posedge clk or negedge rst_n) begin
         play_direct_sram    <= 1'b0;
         fl_timeout_counter  <= 32'd0;  // 32-bit to match declaration
         erase_sector_idx    <= 7'd0;
+        active_flash_slot   <= 2'd0;
+        fl_waiting_for_done <= 1'b0;
         // SRAM defaults
         sram_addr   <= 20'd0;
         sram_wdata  <= 16'd0;
@@ -322,6 +331,9 @@ always @(posedge clk or negedge rst_n) begin
         clear_record_time  <= 1'b0;
         clear_play_time    <= 1'b0;
         trigger_fifo_clear <= 1'b0;
+        if (cancel_pulse) begin
+            fl_waiting_for_done <= 1'b0;
+        end
         adc_read           <= 1'b0;
         dac_write          <= 1'b0;
         fl_op_start_erase  <= 1'b0;
@@ -339,7 +351,7 @@ always @(posedge clk or negedge rst_n) begin
                 mode_code   <= 8'h07;
                 status_code <= 8'h09;
                 trigger_fifo_clear <= 1'b1;
-                next_state  <= ST_CODEC_INIT;
+                state  <= ST_CODEC_INIT;
             end
             
             // ---------------------------------------------------------
@@ -347,7 +359,7 @@ always @(posedge clk or negedge rst_n) begin
                 mode_code   <= 8'h07;
                 status_code <= 8'h09;
                 if (init_counter >= CODEC_INIT_WAIT) begin
-                    next_state <= ST_IDLE;
+                    state <= ST_IDLE;
                 end
             end
             
@@ -366,7 +378,7 @@ always @(posedge clk or negedge rst_n) begin
                     sram_full <= 1'b0;
                     clear_record_time <= 1'b1;
                     trigger_fifo_clear <= 1'b1;
-                    next_state <= ST_RECORD;
+                    state <= ST_RECORD;
                 end
                 else if (key2_pulse) begin
                     // Start play: first load from FLASH
@@ -374,18 +386,20 @@ always @(posedge clk or negedge rst_n) begin
                     flash_error <= 1'b0;
                     fl_header_word_idx <= 4'd0;
                     fl_byte_phase <= 1'b0;
-                    fl_byte_counter <= 23'd0;
+                    active_flash_slot <= sw_flash_slot;
+                    fl_byte_counter <= sw_flash_slot_base;
                     clear_play_time <= 1'b1;
                     play_direct_sram <= 1'b0;
-                    next_state <= ST_LOAD_FLASH_READ_HDR;
+                    state <= ST_LOAD_FLASH_READ_HDR;
                 end
                 else if (key3_pulse && has_record_data) begin
                     // Save SRAM to FLASH
                     if (sw_flash_unlock) begin
                         flash_error <= 1'b0;
                         fl_timeout_counter <= 26'd0;
-                        erase_sector_idx <= 7'd0;
-                        next_state <= ST_SAVE_FLASH_ERASE;
+                        active_flash_slot <= sw_flash_slot;
+                        erase_sector_idx <= sw_flash_slot_sector_base;
+                        state <= ST_SAVE_FLASH_ERASE;
                     end
                     // If SW3=0, flash is locked - stay in IDLE
                     // LCD will show FLASH LOCKED (handled by LCD controller)
@@ -451,12 +465,12 @@ always @(posedge clk or negedge rst_n) begin
                             sram_dq_oe <= 1'b0;
                             sram_op_pending <= 1'b0;
                             
-                            if (sram_write_ptr >= SRAM_MAX_ADDR) begin
-                                // SRAM full
+                            if (sram_write_ptr >= record_limit_addr) begin
+                                // SRAM or selected FLASH slot is full.
                                 sram_full <= 1'b1;
                                 record_length_words <= sram_write_ptr + 20'd1;
                                 has_record_data <= 1'b1;
-                                next_state <= ST_RECORD_STOP;
+                                state <= ST_RECORD_STOP;
                             end else begin
                                 sram_write_ptr <= sram_write_ptr + 20'd1;
                                 record_length_words <= sram_write_ptr + 20'd1;
@@ -470,13 +484,13 @@ always @(posedge clk or negedge rst_n) begin
                     record_length_words <= sram_write_ptr;
                     has_record_data <= (sram_write_ptr > 20'd0);
                     sram_op_pending <= 1'b0;
-                    next_state <= ST_RECORD_STOP;
+                    state <= ST_RECORD_STOP;
                 end
                 
                 // Cancel = abort current recording
                 if (cancel_pulse) begin
                     sram_op_pending <= 1'b0;
-                    next_state <= ST_IDLE;
+                    state <= ST_IDLE;
                 end
             end
             
@@ -492,8 +506,9 @@ always @(posedge clk or negedge rst_n) begin
                 if (key3_pulse && has_record_data && sw_flash_unlock) begin
                     flash_error <= 1'b0;
                     fl_timeout_counter <= 32'd0;
-                    erase_sector_idx <= 7'd0;
-                    next_state <= ST_SAVE_FLASH_ERASE;
+                    active_flash_slot <= sw_flash_slot;
+                    erase_sector_idx <= sw_flash_slot_sector_base;
+                    state <= ST_SAVE_FLASH_ERASE;
                 end
                 else if (key1_pulse) begin
                     // Re-record
@@ -502,7 +517,7 @@ always @(posedge clk or negedge rst_n) begin
                     sram_full <= 1'b0;
                     clear_record_time <= 1'b1;
                     trigger_fifo_clear <= 1'b1;
-                    next_state <= ST_RECORD;
+                    state <= ST_RECORD;
                 end
                 else if (key2_pulse && has_record_data) begin
                     // Direct play from SRAM
@@ -510,10 +525,10 @@ always @(posedge clk or negedge rst_n) begin
                     clear_play_time <= 1'b1;
                     trigger_fifo_clear <= 1'b1;
                     play_direct_sram <= 1'b1;
-                    next_state <= ST_PLAY_SRAM;
+                    state <= ST_PLAY_SRAM;
                 end
                 else if (cancel_pulse) begin
-                    next_state <= ST_IDLE;
+                    state <= ST_IDLE;
                 end
             end
             
@@ -522,15 +537,17 @@ always @(posedge clk or negedge rst_n) begin
                 mode_code   <= 8'h03;
                 status_code <= 8'h01;
                 
-                if (!flash_busy && !fl_op_done) begin
+                if (!flash_busy && !fl_op_done && !fl_waiting_for_done) begin
                     fl_target_addr <= {erase_sector_idx, 16'd0};  // Erase current sector (64KB boundary)
                     fl_op_start_erase <= 1'b1;
+                    fl_waiting_for_done <= 1'b1;
                 end
                 
-                if (fl_op_done) begin
+                if (fl_op_done && fl_waiting_for_done) begin
+                    fl_waiting_for_done <= 1'b0;
                     if (erase_sector_idx == last_sector_needed) begin
                         fl_timeout_counter <= 32'd0;  // Reset timer for erase wait state
-                        next_state <= ST_SAVE_FLASH_ERASE_WAIT;
+                        state <= ST_SAVE_FLASH_ERASE_WAIT;
                     end else begin
                         erase_sector_idx <= erase_sector_idx + 7'd1;
                         fl_timeout_counter <= 32'd0;  // Reset timeout for next sector erase
@@ -540,10 +557,10 @@ always @(posedge clk or negedge rst_n) begin
                 // Timeout (10 seconds per sector erase)
                 if (fl_timeout_counter >= 32'd500_000_000) begin
                     flash_error <= 1'b1;
-                    next_state <= ST_ERROR;
+                    state <= ST_ERROR;
                 end
                 
-                if (cancel_pulse) next_state <= ST_IDLE;
+                if (cancel_pulse) state <= ST_IDLE;
             end
             
             // ---------------------------------------------------------
@@ -557,19 +574,19 @@ always @(posedge clk or negedge rst_n) begin
                     if (fl_ry) begin
                         fl_header_word_idx <= 4'd0;
                         fl_byte_phase <= 1'b0;
-                        fl_byte_counter <= 23'd0;
+                        fl_byte_counter <= flash_slot_base;
                         fl_timeout_counter <= 32'd0;
-                        next_state <= ST_SAVE_FLASH_WRITE_HDR;
+                        state <= ST_SAVE_FLASH_WRITE_HDR;
                     end
                 end
                 
                 // Timeout (30 seconds for entire erase process)
                 if (fl_timeout_counter >= 32'd1_500_000_000) begin
                     flash_error <= 1'b1;
-                    next_state <= ST_ERROR;
+                    state <= ST_ERROR;
                 end
                 
-                if (cancel_pulse) next_state <= ST_IDLE;
+                if (cancel_pulse) state <= ST_IDLE;
             end
             
             // ---------------------------------------------------------
@@ -577,7 +594,7 @@ always @(posedge clk or negedge rst_n) begin
                 mode_code   <= 8'h03;
                 status_code <= 8'h01;
                 
-                if (!flash_busy && !fl_op_done) begin
+                if (!flash_busy && !fl_op_done && !fl_waiting_for_done) begin
                     // Program one byte at a time directly from combinational value
                     fl_target_addr <= fl_byte_counter;
                     if (!fl_byte_phase)
@@ -585,9 +602,11 @@ always @(posedge clk or negedge rst_n) begin
                     else
                         fl_target_data <= header_word_val[15:8];  // High byte
                     fl_op_start_prog <= 1'b1;
+                    fl_waiting_for_done <= 1'b1;
                 end
                 
-                if (fl_op_done) begin
+                if (fl_op_done && fl_waiting_for_done) begin
+                    fl_waiting_for_done <= 1'b0;
                     if (!fl_byte_phase) begin
                         // Low byte done, do high byte
                         fl_byte_phase <= 1'b1;
@@ -600,17 +619,17 @@ always @(posedge clk or negedge rst_n) begin
                         
                         if (fl_header_word_idx >= FLASH_HEADER_WORDS - 1) begin
                             // Header complete, start data
-                            fl_byte_counter <= FLASH_AUDIO_BASE;
+                            fl_byte_counter <= flash_data_base;
                             fl_data_word_counter <= 20'd0;
                             fl_byte_phase <= 1'b0;
                             // Setup SRAM read
                             sram_read_ptr <= 20'd0;
-                            next_state <= ST_SAVE_FLASH_WRITE_DATA;
+                            state <= ST_SAVE_FLASH_WRITE_DATA;
                         end
                     end
                 end
                 
-                if (cancel_pulse) next_state <= ST_IDLE;
+                if (cancel_pulse) state <= ST_IDLE;
             end
             
             // ---------------------------------------------------------
@@ -628,11 +647,12 @@ always @(posedge clk or negedge rst_n) begin
                         sram_addr  <= sram_read_ptr;
                         sram_op_pending <= 1'b1;
                         sram_wait <= 3'd0;
-                    end else begin
+                    end else if (!fl_waiting_for_done) begin
                         // High byte: program to FLASH
                         fl_target_addr <= fl_byte_counter;
                         fl_target_data <= fl_word_buffer[15:8];
                         fl_op_start_prog <= 1'b1;
+                        fl_waiting_for_done <= 1'b1;
                     end
                 end
                 
@@ -648,10 +668,12 @@ always @(posedge clk or negedge rst_n) begin
                         fl_target_addr <= fl_byte_counter;
                         fl_target_data <= sram_rdata[7:0];
                         fl_op_start_prog <= 1'b1;
+                        fl_waiting_for_done <= 1'b1;
                     end
                 end
                 
-                if (fl_op_done) begin
+                if (fl_op_done && fl_waiting_for_done) begin
+                    fl_waiting_for_done <= 1'b0;
                     fl_timeout_counter <= 32'd0;  // Reset watchdog on every byte completion
                     if (!fl_byte_phase) begin
                         fl_byte_phase <= 1'b1;
@@ -663,7 +685,7 @@ always @(posedge clk or negedge rst_n) begin
                         sram_read_ptr <= sram_read_ptr + 20'd1;
                         
                         if (fl_data_word_counter + 20'd1 >= record_length_words) begin
-                            next_state <= ST_SAVE_FLASH_DONE;
+                            state <= ST_SAVE_FLASH_DONE;
                         end
                     end
                 end
@@ -671,10 +693,10 @@ always @(posedge clk or negedge rst_n) begin
                 // Timeout (30 seconds for large data)
                 if (fl_timeout_counter >= 32'd1_500_000_000) begin
                     flash_error <= 1'b1;
-                    next_state <= ST_ERROR;
+                    state <= ST_ERROR;
                 end
                 
-                if (cancel_pulse) next_state <= ST_IDLE;
+                if (cancel_pulse) state <= ST_IDLE;
             end
             
             // ---------------------------------------------------------
@@ -684,7 +706,7 @@ always @(posedge clk or negedge rst_n) begin
                 sram_ce_n   <= 1'b1;
                 
                 if (cancel_pulse || key3_pulse) begin
-                    next_state <= ST_IDLE;
+                    state <= ST_IDLE;
                 end
             end
             
@@ -693,12 +715,14 @@ always @(posedge clk or negedge rst_n) begin
                 mode_code   <= 8'h04;
                 status_code <= 8'h01;
                 
-                if (!flash_busy && !fl_op_done) begin
+                if (!flash_busy && !fl_op_done && !fl_waiting_for_done) begin
                     fl_target_addr <= fl_byte_counter;
                     fl_op_start_read <= 1'b1;
+                    fl_waiting_for_done <= 1'b1;
                 end
                 
-                if (fl_op_done) begin
+                if (fl_op_done && fl_waiting_for_done) begin
+                    fl_waiting_for_done <= 1'b0;
                     if (!fl_byte_phase) begin
                         fl_word_buffer[7:0] <= fl_read_byte;
                         fl_byte_phase <= 1'b1;
@@ -713,7 +737,7 @@ always @(posedge clk or negedge rst_n) begin
                             4'd0: begin
                                 if ({fl_read_byte, fl_word_buffer[7:0]} != FLASH_MAGIC) begin
                                     flash_header_valid <= 1'b0;
-                                    next_state <= ST_ERROR;
+                                    state <= ST_ERROR;
                                 end
                             end
                             4'd4: begin
@@ -732,17 +756,17 @@ always @(posedge clk or negedge rst_n) begin
                         if (fl_header_word_idx >= 4'd6) begin
                             // Header reading sufficient, start loading data
                             if (flash_header_valid) begin
-                                fl_byte_counter <= FLASH_AUDIO_BASE;
+                                fl_byte_counter <= flash_data_base;
                                 fl_data_word_counter <= 20'd0;
                                 fl_byte_phase <= 1'b0;
                                 sram_write_ptr <= 20'd0;
-                                next_state <= ST_LOAD_FLASH_TO_SRAM;
+                                state <= ST_LOAD_FLASH_TO_SRAM;
                             end
                         end
                     end
                 end
                 
-                if (cancel_pulse) next_state <= ST_IDLE;
+                if (cancel_pulse) state <= ST_IDLE;
             end
             
             // ---------------------------------------------------------
@@ -750,12 +774,14 @@ always @(posedge clk or negedge rst_n) begin
                 mode_code   <= 8'h04;
                 status_code <= 8'h01;
                 
-                if (!flash_busy && !fl_op_done && !sram_op_pending) begin
+                if (!flash_busy && !fl_op_done && !sram_op_pending && !fl_waiting_for_done) begin
                     fl_target_addr <= fl_byte_counter;
                     fl_op_start_read <= 1'b1;
+                    fl_waiting_for_done <= 1'b1;
                 end
                 
-                if (fl_op_done) begin
+                if (fl_op_done && fl_waiting_for_done) begin
+                    fl_waiting_for_done <= 1'b0;
                     if (!fl_byte_phase) begin
                         fl_word_buffer[7:0] <= fl_read_byte;
                         fl_byte_phase <= 1'b1;
@@ -791,7 +817,7 @@ always @(posedge clk or negedge rst_n) begin
                         if (fl_data_word_counter + 20'd1 >= flash_audio_length) begin
                             record_length_words <= flash_audio_length;
                             play_from_sram_ready <= 1'b1;
-                            next_state <= ST_LOAD_FLASH_DONE;
+                            state <= ST_LOAD_FLASH_DONE;
                         end
                     end
                 end
@@ -799,10 +825,10 @@ always @(posedge clk or negedge rst_n) begin
                 // Timeout (30 seconds)
                 if (fl_timeout_counter >= 32'd1_500_000_000) begin
                     flash_error <= 1'b1;
-                    next_state <= ST_ERROR;
+                    state <= ST_ERROR;
                 end
                 
-                if (cancel_pulse) next_state <= ST_IDLE;
+                if (cancel_pulse) state <= ST_IDLE;
             end
             
             // ---------------------------------------------------------
@@ -817,7 +843,7 @@ always @(posedge clk or negedge rst_n) begin
                     clear_play_time <= 1'b1;
                     trigger_fifo_clear <= 1'b1;
                     play_direct_sram <= 1'b0;
-                    next_state <= ST_PLAY_SRAM;
+                    state <= ST_PLAY_SRAM;
                 end
             end
             
@@ -863,7 +889,7 @@ always @(posedge clk or negedge rst_n) begin
                                 clear_play_time <= 1'b1;
                             end else begin
                                 play_active <= 1'b0;
-                                next_state <= play_direct_sram ? ST_RECORD_STOP : ST_IDLE;
+                                state <= play_direct_sram ? ST_RECORD_STOP : ST_IDLE;
                             end
                         end else begin
                             sram_read_ptr <= sram_read_ptr + 20'd1;
@@ -875,14 +901,14 @@ always @(posedge clk or negedge rst_n) begin
                 if (key2_pulse) begin
                     sram_op_pending <= 1'b0;
                     sram_ce_n <= 1'b1;
-                    next_state <= ST_PLAY_PAUSE;
+                    state <= ST_PLAY_PAUSE;
                 end
                 
                 // Stop
                 if (cancel_pulse) begin
                     play_active <= 1'b0;
                     sram_op_pending <= 1'b0;
-                    next_state <= play_direct_sram ? ST_RECORD_STOP : ST_IDLE;
+                    state <= play_direct_sram ? ST_RECORD_STOP : ST_IDLE;
                 end
             end
             
@@ -897,11 +923,11 @@ always @(posedge clk or negedge rst_n) begin
                     play_active     <= 1'b1;
                     sram_wait       <= 3'd0;    // 修復：重置 SRAM wait counter 避免播放無聲
                     sram_op_pending <= 1'b0;    // 確保 pending 旗標乾淨
-                    next_state      <= ST_PLAY_SRAM;
+                    state      <= ST_PLAY_SRAM;
                 end
                 
                 if (cancel_pulse) begin
-                    next_state <= play_direct_sram ? ST_RECORD_STOP : ST_IDLE;
+                    state <= play_direct_sram ? ST_RECORD_STOP : ST_IDLE;
                 end
             end
             
@@ -925,12 +951,12 @@ always @(posedge clk or negedge rst_n) begin
                 if (cancel_pulse) begin
                     flash_error <= 1'b0;
                     sram_full <= 1'b0;
-                    next_state <= ST_IDLE;
+                    state <= ST_IDLE;
                 end
             end
             
             default: begin
-                next_state <= ST_RESET;
+                state <= ST_RESET;
             end
         endcase
 
@@ -969,6 +995,7 @@ always @(posedge clk or negedge rst_n) begin
         if (!flash_busy && dbg_flash_busy_d) begin
             dbg_flash_last_cycles <= dbg_flash_busy_cycles;
         end
+
     end
 end
 
