@@ -1,0 +1,89 @@
+\documentclass[12pt,a4paper]{article}
+
+
+% ----- Encoding & Fonts -----
+\usepackage{fontspec}
+\usepackage{xeCJK}
+% English fonts
+\setmainfont{Times New Roman}
+%\setsansfont{Arial}
+%\setmonofont{Consolas}
+
+% Chinese fonts (Windows built-in)
+\setCJKmainfont[AutoFakeBold=3, AutoFakeSlant=0.2]{標楷體.ttf}  
+\setCJKmonofont[AutoFakeBold=3]{微軟正黑體.ttf}
+
+% Line breaking for Chinese
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip = 0pt plus 1pt
+
+% ----- Page Layout -----
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{setspace}
+
+% ----- Figures, Tables, Math -----
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{siunitx}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{url}
+
+% ----- Title and Author Info -----
+\usepackage{titling}
+\setlength{\droptitle}{-5em} 
+
+
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
+\hypersetup{pdfborder={0 0 0}}
+\sisetup{detect-all}
+
+\usepackage[capitalize]{cleveref}
+% ----- Code Listings -----
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+
+% ----- Bibliography (biblatex + biber) -----
+\usepackage[backend=biber,style=ieee,sorting=nyt,doi=false,isbn=false,url=true]{biblatex}
+\addbibresource{refs.bib}
+
+\input{labels.tex}
+
+% \pretitle{\begin{center}\vspace{-2.5em}\Huge\bfseries}
+% \posttitle{\par\end{center}}
+% ----- Title Info -----
+\title{
+  \univCname-\deptCname\\
+  \vspace{0.3em} % 縮短校名與課名之間的距離
+  \LARGE \course\\
+  \vspace{0.3em} % 縮短課名與題目之間的距離
+  \Large \cTitle
+}
+
+\author{
+    \myCname~{\tt t\ID@ntut.org.tw} \class
+}
+% \date{\today}
+\date{}
+
+\begin{document}
+\maketitle
+
+\vspace{-5em}
+
+\input{sections/00-abstract}
+
+\input{sections/01-intro}
+\input{sections/02-ProjectDesign}
+
+%\printbibliography
+\end{document}

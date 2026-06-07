@@ -1,0 +1,37 @@
+\section{系統規格}
+
+\section{音訊規格}
+
+\begin{table}[htbp]
+    \centering
+    \caption{音訊系統規格}
+    \label{tab:audio_spec}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{>{\centering\arraybackslash}p{4cm}
+                    >{\centering\arraybackslash}p{7cm}}
+        \toprule
+        項目 & 規格 \\
+        \midrule
+        Audio CODEC & WM8731 \\
+        取樣頻率 & 22.4 kHz \\
+        取樣位元 & 16 bit \\
+        聲道 & 可設計為 Mono 或 Stereo \\
+        音訊來源 & Mic-in 或 Line-in \\
+        音訊輸出 & Line-out 或耳機輸出 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{記憶體容量估算}
+
+本系統音訊資料格式為 16 bit，取樣頻率為 22.4 kHz。若採用單聲道 Mono 錄音，則每秒需要儲存 22400 筆 16 bit 音訊資料。
+
+\subsection{SRAM 可錄音時間}
+
+SRAM 容量為 1M$\times$16 bit，因此可儲存約 1,048,576 筆 16 bit 資料。其可錄音時間估算如下：
+
+\[
+T_{\mathrm{SRAM}} = \frac{1{,}048{,}576}{22{,}400} \approx 46.8 \text{ 秒}
+\]
+
+因此，SRAM 約可暫存 46.8 秒的單聲道音訊資料。
