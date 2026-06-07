@@ -475,19 +475,42 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FL_WP_N
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-set_global_assignment -name VERILOG_FILE ../ip/terasic_seg7/SEG7_IF.v
+# SEG7_IF.v excluded: Terasic legacy IP, not instantiated in current design
+# set_global_assignment -name VERILOG_FILE ../ip/terasic_seg7/SEG7_IF.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_i2c/I2C_Controller.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_i2c/I2C_AV_Config.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_clock/Reset_Delay.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_clock/PLL.v
-set_global_assignment -name VERILOG_FILE ../ip/terasic_audio/AUDIO_IF.v
+# AUDIO_IF.v excluded: Terasic legacy audio interface, replaced by custom AUDIO_ADC/AUDIO_DAC
+# set_global_assignment -name VERILOG_FILE ../ip/terasic_audio/AUDIO_IF.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_audio/audio_fifo.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_audio/AUDIO_DAC.v
 set_global_assignment -name VERILOG_FILE ../ip/terasic_audio/AUDIO_ADC.v
+set_global_assignment -name VERILOG_FILE ../rtl/audio/audio_adc_aligned.v
+set_global_assignment -name VERILOG_FILE ../rtl/audio/audio_dac_aligned.v
 set_global_assignment -name VERILOG_FILE ../rtl/audio_spectrum_top.v
+set_global_assignment -name VERILOG_FILE ../ip/terasic_clock/audio_pll.v
+set_global_assignment -name VERILOG_FILE ../rtl/system/key_debounce.v
+set_global_assignment -name VERILOG_FILE ../rtl/system/one_pulse.v
+set_global_assignment -name VERILOG_FILE ../rtl/system/system_fsm.v
+set_global_assignment -name VERILOG_FILE ../rtl/display/sevenseg_decoder.v
+set_global_assignment -name VERILOG_FILE ../rtl/display/hex_status_timer_display.v
+set_global_assignment -name VERILOG_FILE ../rtl/display/ledr_volume_meter.v
+set_global_assignment -name VERILOG_FILE ../rtl/display/record_time_counter.v
+set_global_assignment -name VERILOG_FILE ../ip/terasic_lcd/LCD_Controller.v
+set_global_assignment -name VERILOG_FILE ../rtl/display/lcd_status_controller.v
+set_global_assignment -name VERILOG_FILE ../rtl/system/flash_controller.v
+# flash_test_top.v excluded: test-only top, not part of main design
 set_global_assignment -name SDC_FILE AudioSpectrum_FPGA.SDC
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+
+set_global_assignment -name USE_CONFIGURATION_DEVICE ON
+set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

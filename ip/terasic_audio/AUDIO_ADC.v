@@ -64,8 +64,50 @@ reg								wait_one_clk;
  *****************************************************************************/
 
 //===== Serialize data (I2S) to ADC-FIFO =====
+// Synchronize asynchronous adclrc to 50 MHz clk domain
+reg [1:0] adclrc_sync_clk;
+always @(posedge clk or posedge reset) begin
+	if (reset)
+		adclrc_sync_clk <= 2'b11;
+	else
+		adclrc_sync_clk <= {adclrc_sync_clk[0], adclrc};
+end
+wire adclrc_sync_val = adclrc_sync_clk[1];
+
+// Debounce synchronized adclrc in 50 MHz clk domain (filters transitions < 2 us)
+reg [6:0] adclrc_cnt;
+reg       adclrc_filt;
+
+always @(posedge clk or posedge reset) begin
+	if (reset) begin
+		adclrc_cnt  <= 7'd0;
+		adclrc_filt <= 1'b1;
+	end else begin
+		if (adclrc_sync_val == adclrc_filt) begin
+			adclrc_cnt <= 7'd0;
+		end else begin
+			if (adclrc_cnt >= 7'd100) begin
+				adclrc_filt <= adclrc_sync_val;
+				adclrc_cnt  <= 7'd0;
+			end else begin
+				adclrc_cnt <= adclrc_cnt + 7'd1;
+			end
+		end
+	end
+end
+
+// Synchronize debounced signal to bclk domain
+reg [1:0] adclrc_sync_bclk;
+always @(posedge bclk or posedge reset) begin
+	if (reset) begin
+		adclrc_sync_bclk <= 2'b11;
+	end else begin
+		adclrc_sync_bclk <= {adclrc_sync_bclk[0], adclrc_filt};
+	end
+end
+
 wire is_left_ch;
-assign is_left_ch = ~adclrc;
+assign is_left_ch = ~adclrc_sync_bclk[1];
 always @ (posedge bclk) 
 begin
 	if (reset || clear)

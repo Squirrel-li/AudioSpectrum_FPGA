@@ -1,12 +1,14 @@
 module I2C_AV_Config (	//	Host Side
 						iCLK,
 						iRST_N,
+						iSW_INPUT_SOURCE,
 						//	I2C Side
 						I2C_SCLK,
 						I2C_SDAT	);
 //	Host Side
 input		iCLK;
 input		iRST_N;
+input		iSW_INPUT_SOURCE;
 //	I2C Side
 output		I2C_SCLK;
 inout		I2C_SDAT;
@@ -20,6 +22,18 @@ wire		mI2C_ACK;
 reg	[15:0]	LUT_DATA;
 reg	[5:0]	LUT_INDEX;
 reg	[3:0]	mSetup_ST;
+
+// Dynamic registers
+reg [1:0]   dyn_state;
+reg         sw_input_source_d1;
+reg         sw_input_source_d2;
+wire        input_source_changed;
+
+localparam DYN_IDLE = 2'd0;
+localparam DYN_SEND = 2'd1;
+localparam DYN_WAIT = 2'd2;
+
+assign input_source_changed = sw_input_source_d1 ^ sw_input_source_d2;
 
 //	Clock Setting
 parameter	CLK_Freq	=	50000000;	//	50	MHz
@@ -78,9 +92,15 @@ begin
 		LUT_INDEX	<=	0;
 		mSetup_ST	<=	0;
 		mI2C_GO		<=	0;
+		dyn_state	<=	DYN_IDLE;
+		sw_input_source_d1 <= 1'b0;
+		sw_input_source_d2 <= 1'b0;
 	end
 	else
 	begin
+		sw_input_source_d1 <= iSW_INPUT_SOURCE;
+		sw_input_source_d2 <= sw_input_source_d1;
+
 		if(LUT_INDEX<LUT_SIZE)
 		begin
 			case(mSetup_ST)
@@ -108,6 +128,30 @@ begin
 				end
 			endcase
 		end
+		else
+		begin
+			case(dyn_state)
+				DYN_IDLE: begin
+					if(input_source_changed) begin
+						dyn_state <= DYN_SEND;
+					end
+				end
+				DYN_SEND: begin
+					// Disable BYPASS (bit3=0) and SIDETONE (bit5=0); keep DACSEL (bit4=1)
+					// Line In: 0x10 = 0001_0000 (DACSEL=1, BYPASS=0, INSEL=Line)
+					// Mic In:  0x15 = 0001_0101 (DACSEL=1, BYPASS=0, INSEL=Mic, MICBOOST=1)
+					mI2C_DATA <= {8'h34, 8'h08, iSW_INPUT_SOURCE ? 8'h15 : 8'h10};
+					mI2C_GO   <= 1'b1;
+					dyn_state <= DYN_WAIT;
+				end
+				DYN_WAIT: begin
+					if(mI2C_END) begin
+						mI2C_GO   <= 1'b0;
+						dyn_state <= DYN_IDLE;
+					end
+				end
+			endcase
+		end
 	end
 end
 ////////////////////////////////////////////////////////////////////
@@ -116,14 +160,19 @@ always
 begin
 	case(LUT_INDEX)
 	//	Audio Config Data
-	SET_LIN_L	:	LUT_DATA	<=	16'h001A;
-	SET_LIN_R	:	LUT_DATA	<=	16'h021A;
-	SET_HEAD_L	:	LUT_DATA	<=	16'h047B;
-	SET_HEAD_R	:	LUT_DATA	<=	16'h067B;
-	A_PATH_CTRL	:	LUT_DATA	<=	16'h08F8;
-	D_PATH_CTRL	:	LUT_DATA	<=	16'h0A06;
+	SET_LIN_L	:	LUT_DATA	<=	16'h0017;
+	SET_LIN_R	:	LUT_DATA	<=	16'h0217;
+	SET_HEAD_L	:	LUT_DATA	<=	16'h045B;
+	SET_HEAD_R	:	LUT_DATA	<=	16'h065B;
+	// Disable BYPASS (bit3=0) and SIDETONE (bit5=0); keep DACSEL (bit4=1)
+	// Line In: 0x10 = 0001_0000 | Mic: 0x15 = 0001_0101
+	A_PATH_CTRL	:	LUT_DATA	<=	iSW_INPUT_SOURCE ? 16'h0815 : 16'h0810;
+	D_PATH_CTRL	:	LUT_DATA	<=	16'h0A00;
 	POWER_ON	:	LUT_DATA	<=	16'h0C00;
-	SET_FORMAT	:	LUT_DATA	<=	16'h0E01;
+	// WM8731 digital audio interface:
+	// MS=1 codec master, IWL=00 16-bit, FORMAT=10 I2S.
+	// This matches the DE2-115 Audio demo software initialization.
+	SET_FORMAT	:	LUT_DATA	<=	16'h0E42;
 	SAMPLE_CTRL	:	LUT_DATA	<=	16'h1002;
 	SET_ACTIVE	:	LUT_DATA	<=	16'h1201;
 	//	Video Config Data

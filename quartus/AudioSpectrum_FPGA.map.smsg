@@ -1,2 +1,0 @@
-Warning (10268): Verilog HDL information at AUDIO_IF.v(162): always construct contains both blocking and non-blocking assignments
-Warning (10268): Verilog HDL information at AUDIO_IF.v(178): always construct contains both blocking and non-blocking assignments

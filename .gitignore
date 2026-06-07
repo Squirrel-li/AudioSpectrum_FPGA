@@ -1,0 +1,25 @@
+# Quartus generated databases and reports
+quartus/db/
+quartus/incremental_db/
+quartus/*.rpt
+quartus/*.summary
+quartus/*.smsg
+quartus/*.done
+quartus/*.jdi
+quartus/*.pin
+quartus/*.sof
+quartus/*.qws
+quartus/*.htm
+quartus/*.qdf
+quartus/*.cdf
+quartus/*PLL*SPE_INFO.txt
+
+# Keep the v1.0 programming image requested for version tracking.
+quartus/*.pof
+!quartus/AudioSpectrum_FPGA.pof
+
+# Simulation outputs
+*.vcd
+sim/*.vvp
+sim/work/
+sim/transcript
