@@ -44,8 +44,10 @@ behavior, clocking assumption, or instantiation changes.
   - `KEY[1]`: record/stop.
   - `KEY[2]`: play/pause.
   - `KEY[3]`: save/confirm/cancel depending on FSM state.
+  - `SW[0]`: LEDR volume meter enable.
   - `SW[3]`: FLASH write unlock.
   - `SW[5]`: mute.
+  - `SW[7:6]`: LEDR volume meter sensitivity selector (00=1x, 01=2x, 10=4x, 11=8x boost).
   - `SW[11:10]`: FLASH Slot select, 0 through 3.
   - `SW[17]`: line-in/mic source selection.
 
