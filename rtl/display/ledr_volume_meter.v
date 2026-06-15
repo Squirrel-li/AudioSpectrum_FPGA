@@ -10,6 +10,7 @@ module ledr_volume_meter (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        enable,          // SW0: 0=all off, 1=show volume
+    input  wire [1:0]  sensitivity,     // SW[7:6]: 00=1x, 01=2x, 10=4x, 11=8x
     input  wire        sample_valid,    // pulse when new sample arrives
     input  wire signed [15:0] sample_in,
     output reg  [17:0] ledr
@@ -36,15 +37,23 @@ module ledr_volume_meter (
     end
 
     //=========================================================================
-    // Map smoothed amplitude to bar count (0~18)
+    // Map smoothed amplitude to bar count (0~18) with dynamic sensitivity
     //=========================================================================
-    // bars = smooth_amp * 18 / 32768  (>> 15)
-    // Max: 65535 * 18 = 1,179,630 → needs 21 bits to avoid overflow
-    wire [20:0] bars_wide;
+    // boosted_amp = smooth_amp * (2^sensitivity)
+    // bars = boosted_amp * 18 / 32768
+    wire [23:0] boosted_amp;
+    assign boosted_amp = {8'd0, smooth_amp} << sensitivity;
+
+    // Max boosted_amp: 32767 * 8 = 262136.
+    // bars_wide = boosted_amp * 18
+    // Max bars_wide: 262136 * 18 = 4718448 (fits in 28-bit)
+    wire [27:0] bars_wide;
+    wire [12:0] bars_div;
     wire [4:0]  bars;
 
-    assign bars_wide = {1'b0, smooth_amp} * 21'd18;  // zero-extend to 21-bit
-    assign bars      = (bars_wide[20:15] > 5'd18) ? 5'd18 : bars_wide[20:15];
+    assign bars_wide = boosted_amp * 28'd18;
+    assign bars_div  = bars_wide[27:15]; // divide by 32768
+    assign bars      = (bars_div > 13'd18) ? 5'd18 : bars_div[4:0];
 
     //=========================================================================
     // Generate thermometer-coded LED pattern

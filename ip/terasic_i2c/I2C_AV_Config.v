@@ -162,8 +162,8 @@ begin
 	//	Audio Config Data
 	SET_LIN_L	:	LUT_DATA	<=	16'h0017;
 	SET_LIN_R	:	LUT_DATA	<=	16'h0217;
-	SET_HEAD_L	:	LUT_DATA	<=	16'h045B;
-	SET_HEAD_R	:	LUT_DATA	<=	16'h065B;
+	SET_HEAD_L	:	LUT_DATA	<=	16'h0479;
+	SET_HEAD_R	:	LUT_DATA	<=	16'h0679;
 	// Disable BYPASS (bit3=0) and SIDETONE (bit5=0); keep DACSEL (bit4=1)
 	// Line In: 0x10 = 0001_0000 | Mic: 0x15 = 0001_0101
 	A_PATH_CTRL	:	LUT_DATA	<=	iSW_INPUT_SOURCE ? 16'h0815 : 16'h0810;

@@ -382,6 +382,7 @@ ledr_volume_meter u_volume_meter (
     .clk(CLOCK_50),
     .rst_n(rst_n),
     .enable(SW[0]),
+    .sensitivity(SW[7:6]),
     .sample_valid(sample_valid_out),
     .sample_in(current_sample),
     .ledr(LEDR)
