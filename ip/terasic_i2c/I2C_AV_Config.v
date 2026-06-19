@@ -27,13 +27,16 @@ reg	[3:0]	mSetup_ST;
 reg [1:0]   dyn_state;
 reg         sw_input_source_d1;
 reg         sw_input_source_d2;
+reg [6:0]   sw_debounce_cnt;       // 12.8ms debounce at 10kHz clock
+reg         sw_input_source_deb;   // fully debounced input source
+reg         sw_input_source_deb_prev;
 wire        input_source_changed;
 
 localparam DYN_IDLE = 2'd0;
 localparam DYN_SEND = 2'd1;
 localparam DYN_WAIT = 2'd2;
 
-assign input_source_changed = sw_input_source_d1 ^ sw_input_source_d2;
+assign input_source_changed = sw_input_source_deb ^ sw_input_source_deb_prev;
 
 //	Clock Setting
 parameter	CLK_Freq	=	50000000;	//	50	MHz
@@ -95,11 +98,27 @@ begin
 		dyn_state	<=	DYN_IDLE;
 		sw_input_source_d1 <= 1'b0;
 		sw_input_source_d2 <= 1'b0;
+		sw_debounce_cnt    <= 7'd0;
+		sw_input_source_deb <= 1'b0;
+		sw_input_source_deb_prev <= 1'b0;
 	end
 	else
 	begin
 		sw_input_source_d1 <= iSW_INPUT_SOURCE;
 		sw_input_source_d2 <= sw_input_source_d1;
+		sw_input_source_deb_prev <= sw_input_source_deb;
+
+		// Debounce filter for mechanical slide switch bounces
+		if (sw_input_source_d2 != sw_input_source_deb) begin
+			if (sw_debounce_cnt == 7'd127) begin
+				sw_input_source_deb <= sw_input_source_d2;
+				sw_debounce_cnt     <= 7'd0;
+			end else begin
+				sw_debounce_cnt     <= sw_debounce_cnt + 7'd1;
+			end
+		end else begin
+			sw_debounce_cnt <= 7'd0;
+		end
 
 		if(LUT_INDEX<LUT_SIZE)
 		begin
@@ -140,7 +159,7 @@ begin
 					// Disable BYPASS (bit3=0) and SIDETONE (bit5=0); keep DACSEL (bit4=1)
 					// Line In: 0x10 = 0001_0000 (DACSEL=1, BYPASS=0, INSEL=Line)
 					// Mic In:  0x15 = 0001_0101 (DACSEL=1, BYPASS=0, INSEL=Mic, MICBOOST=1)
-					mI2C_DATA <= {8'h34, 8'h08, iSW_INPUT_SOURCE ? 8'h15 : 8'h10};
+					mI2C_DATA <= {8'h34, 8'h08, sw_input_source_deb ? 8'h15 : 8'h10};
 					mI2C_GO   <= 1'b1;
 					dyn_state <= DYN_WAIT;
 				end
@@ -166,7 +185,7 @@ begin
 	SET_HEAD_R	:	LUT_DATA	<=	16'h0679;
 	// Disable BYPASS (bit3=0) and SIDETONE (bit5=0); keep DACSEL (bit4=1)
 	// Line In: 0x10 = 0001_0000 | Mic: 0x15 = 0001_0101
-	A_PATH_CTRL	:	LUT_DATA	<=	iSW_INPUT_SOURCE ? 16'h0815 : 16'h0810;
+	A_PATH_CTRL	:	LUT_DATA	<=	sw_input_source_deb ? 16'h0815 : 16'h0810;
 	D_PATH_CTRL	:	LUT_DATA	<=	16'h0A00;
 	POWER_ON	:	LUT_DATA	<=	16'h0C00;
 	// WM8731 digital audio interface:
