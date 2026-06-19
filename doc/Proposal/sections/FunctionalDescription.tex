@@ -2,20 +2,20 @@
 
 \subsection{錄音功能}
 
-使用者按下錄音按鍵後，系統進入錄音模式。Audio CODEC WM8731 會將麥克風或 Line-in 輸入的類比聲音轉換為數位音訊資料，FPGA 以 22.4 kHz 的取樣頻率接收 16 bit 音訊資料，並將資料依序寫入 SRAM 中。錄音過程中，LCD 顯示目前為 Recording 狀態，LED 則可顯示錄音進度或錄音狀態。
+使用者按下 KEY1 後，系統進入錄音模式。Audio CODEC WM8731 會將麥克風或 Line-in 輸入的類比聲音轉換為數位音訊資料，FPGA 以 48 kHz、16 bit 的設定接收音訊 sample，並將 left channel 依序寫入 SRAM。錄音過程中，LCD 顯示目前輸入來源與錄音秒數，LEDR 則以音量條顯示聲音大小。
 
 \subsection{SRAM 暫存功能}
 
-錄製完成後，音訊資料會先保存在 SRAM 中。SRAM 屬於高速暫存記憶體，適合用於即時錄音資料儲存。使用者可以先播放 SRAM 中的錄音內容進行確認，若錄音結果不理想，則可以重新錄製並覆蓋原本 SRAM 中的資料。
+錄製完成後，音訊資料會先保存在 SRAM 中。SRAM 屬於高速暫存記憶體，適合用於即時錄音資料儲存。錄音停止後，使用者可以重新錄製、播放目前 SRAM 暫存資料，或在 FLASH 解鎖後將資料保存到 FLASH。
 
 \subsection{FLASH 儲存功能}
 
-當使用者確認錄音內容後，系統會將 SRAM 中的音訊資料寫入 FLASH。FLASH 屬於非揮發性記憶體，即使 FPGA 關機後，資料仍可保存。因此本系統採用先暫存於 SRAM，再由使用者確認後寫入 FLASH 的方式，避免錄音失敗時直接覆蓋永久資料。
+當使用者確認錄音內容後，系統會將 SRAM 中的音訊資料寫入 FLASH。FLASH 屬於非揮發性記憶體，即使 FPGA 關機後，資料仍可保存。本系統使用 SW3 作為 FLASH 寫入保護，並透過 SW[11:10] 選擇 Slot 0 到 Slot 3，避免每次儲存都覆蓋同一段資料。
 
 \subsection{播放功能}
 
-使用者進入播放模式後，FPGA 會從 SRAM 或 FLASH 中讀取音訊資料，再透過 Audio CODEC WM8731 將數位音訊資料轉換為類比聲音輸出。播放過程中，LCD 會顯示目前播放來源與播放狀態，例如 Play SRAM 或 Play FLASH。
+使用者按下 KEY2 播放時，系統會先讀取目前 FLASH slot 的 header，確認資料有效後執行 FLASH 到 SRAM 的載入流程，再由 SRAM 依照 codec sample tick 播放音訊。此版本不直接從 FLASH 串流播放，以避免 FLASH 存取時序干擾連續音訊輸出。
 
-\subsection{FFT 頻譜顯示功能}
+\subsection{LEDR 音量顯示功能}
 
-播放聲音時，FPGA 會同時擷取音訊資料進行 FFT 分析，將時域音訊訊號轉換為頻域資料。系統再將頻率能量分成 8 個頻帶，對應到 8$\times$8 LED 矩陣的 8 個欄位。每一欄的高度代表該頻帶的能量大小，因此播放音樂時，LED 矩陣會隨著不同頻率能量變化而跳動，達成類似音樂頻譜分析器的效果。
+錄音或播放時，FPGA 會取目前 audio sample 的振幅，經過簡單平滑後對應到 18 顆 LEDR，形成由左至右增加的音量條。SW0 可關閉音量條，SW[7:6] 可調整 1x、2x、4x、8x 靈敏度。本版本不實作 FFT 頻譜分析，也不使用外接 LED 矩陣。

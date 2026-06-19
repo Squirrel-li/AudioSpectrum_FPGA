@@ -12,14 +12,14 @@
         硬體資源 & 規格 / 數量 & 用途 \\
         \midrule
         Audio CODEC & WM8731 & 音訊輸入與輸出 \\
-        LCD & 16$\times$2 HD44780 & 顯示模式與操作提示 \\
-        LED 矩陣 & 8$\times$8 LED & 顯示 FFT 頻譜 \\
-        SRAM & 1M$\times$16 bit & 錄音資料暫存 \\
-        FLASH & 4M$\times$16 bit & 錄音資料永久儲存 \\
-        Red LED & 18 顆 & 狀態顯示、音量或模式提示 \\
-        Green LED & 9 顆 & 狀態顯示、播放或錄音提示 \\
-        BUTTON & 多顆 & 控制錄音、播放、確認、停止 \\
-        SW & 多個 & 模式選擇或功能設定 \\
+        LCD & 16$\times$2 HD44780 & 顯示模式、操作提示與錯誤訊息 \\
+        SRAM & 1M$\times$16 bit & 錄音資料暫存與播放緩衝 \\
+        FLASH & 4M$\times$16 bit & 錄音資料永久儲存，分為 4 個 slot \\
+        Red LED & 18 顆 & LEDR 音量條顯示 \\
+        Green LED & 9 顆 & 系統狀態與除錯訊號 \\
+        HEX & 8 位七段顯示器 & 顯示模式、狀態、slot、輸入來源與秒數 \\
+        BUTTON & 4 顆 & Reset、錄音、播放、確認 / 儲存 \\
+        SW & 18 個 & LEDR、FLASH 解鎖、循環、靜音、slot 與輸入來源設定 \\
         \bottomrule
     \end{tabular}
 \end{table}

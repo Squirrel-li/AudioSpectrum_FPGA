@@ -46,10 +46,12 @@ behavior, clocking assumption, or instantiation changes.
   - `KEY[3]`: save/confirm/cancel depending on FSM state.
   - `SW[0]`: LEDR volume meter enable.
   - `SW[3]`: FLASH write unlock.
+  - `SW[4]`: loop playback.
   - `SW[5]`: mute.
   - `SW[7:6]`: LEDR volume meter sensitivity selector (00=1x, 01=2x, 10=4x, 11=8x boost).
   - `SW[11:10]`: FLASH Slot select, 0 through 3.
   - `SW[17]`: line-in/mic source selection.
+  - `SW[1]`, `SW[2]`, `SW[8]`, `SW[9]`, and `SW[16:12]`: not part of the current user-facing flow.
 
 ## Project-Owned Audio Modules
 
@@ -105,6 +107,7 @@ behavior, clocking assumption, or instantiation changes.
   - Directly drives SRAM pins and instantiates `flash_controller`.
 - Important behavior:
   - Records left channel samples to SRAM.
+  - Current top-level parameters use `SAMPLE_RATE_HZ = 48000`.
   - During SRAM playback, reads one SRAM word per `dac_sample_tick` so playback
     speed follows the codec LRCK/sample rate instead of the 50 MHz FSM speed.
   - Saves 16-bit SRAM words to 8-bit FLASH low byte first.

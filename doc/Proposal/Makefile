@@ -1,9 +1,9 @@
-# Build with latexmk (XeLaTeX + biber)
 all:
-	latexmk -xelatex -shell-escape -interaction=nonstopmode main.tex
+	xelatex -shell-escape -interaction=nonstopmode main.tex
+	biber main
+	xelatex -shell-escape -interaction=nonstopmode main.tex
 
 clean:
-	latexmk -C
-	rm -f *.bbl *.blg *.run.xml *.bcf
+	rm -f *.aux *.bbl *.bcf *.blg *.fdb_latexmk *.fls *.log *.out *.run.xml *.toc
 
 .PHONY: all clean
