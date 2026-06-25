@@ -1,4 +1,0 @@
-# Use XeLaTeX and biber
-$pdflatex = 'xelatex -interaction=nonstopmode -synctex=1 %O %S';
-$bibtex = 'biber %O %B';
-add_cus_dep('bib', 'bbl', 0, 'biber');

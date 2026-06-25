@@ -1,0 +1,94 @@
+<mxfile host="Electron" modified="2026-06-02T17:36:12.262Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" etag="sMc-L5o24ZjWyhznTLCi" version="22.1.2" type="device">
+  <diagram name="第 1 页" id="WObV30-WZAv5Gzq08Q3H">
+    <mxGraphModel dx="1185" dy="694" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-9" target="d6Q1qdE1_47q80nFKLTg-8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="120" as="sourcePoint" />
+            <mxPoint x="520" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-6" target="d6Q1qdE1_47q80nFKLTg-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-23" value="播放" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="d6Q1qdE1_47q80nFKLTg-17">
+          <mxGeometry x="-0.2803" relative="1" as="geometry">
+            <mxPoint x="20" y="-10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-6" target="d6Q1qdE1_47q80nFKLTg-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-24" value="錄音" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="d6Q1qdE1_47q80nFKLTg-18">
+          <mxGeometry x="-0.6305" y="-1" relative="1" as="geometry">
+            <mxPoint y="-11" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-6" value="選擇功能" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="470" y="220" width="100" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-8" target="d6Q1qdE1_47q80nFKLTg-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-8" value="LCD&lt;br&gt;顯示主選單" style="shape=parallelogram;html=1;strokeWidth=2;perimeter=parallelogramPerimeter;whiteSpace=wrap;rounded=1;arcSize=12;size=0.23;" vertex="1" parent="1">
+          <mxGeometry x="470" y="140" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-9" value="開機" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_2;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="480" y="40" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-11" target="d6Q1qdE1_47q80nFKLTg-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-11" value="音訊資料&lt;br&gt;寫入SRAM" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="610" y="320" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-12" target="d6Q1qdE1_47q80nFKLTg-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-12" value="FLASH資料&lt;br&gt;複製至SRAM" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="320" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-13" target="d6Q1qdE1_47q80nFKLTg-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-13" value="Audio CODEC &lt;br&gt;播放聲音" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="400" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-14" value="重新錄音" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="540" y="500" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-15" target="d6Q1qdE1_47q80nFKLTg-14">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-15" target="d6Q1qdE1_47q80nFKLTg-16">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="730" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-15" value="是否儲存" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="610" y="400" width="100" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-16" value="音訊資料&lt;br&gt;寫入FLASH" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="500" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="d6Q1qdE1_47q80nFKLTg-25" target="d6Q1qdE1_47q80nFKLTg-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-25" value="FFT頻譜分析" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="480" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d6Q1qdE1_47q80nFKLTg-26" value="8*8 LED&lt;br&gt;顯示頻譜" style="shape=parallelogram;html=1;strokeWidth=2;perimeter=parallelogramPerimeter;whiteSpace=wrap;rounded=1;arcSize=12;size=0.23;" vertex="1" parent="1">
+          <mxGeometry x="340" y="560" width="100" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
